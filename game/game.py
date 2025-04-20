@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 import random
+import math
 from pgzero.actor import Actor
 from pgzero.keyboard import keyboard
+import pgzrun
 
+pgzrun.go()
 WIDTH = 800
 HEIGHT = 600
 
@@ -10,7 +13,6 @@ game_state = "menu"
 music_on = True
 
 background = Actor("background")
-
 music.play("bgmusic")
 music.set_volume(0.5)
 
@@ -21,6 +23,10 @@ platforms = [
     Rect((200, 250), (200, 20)),
     Rect((400, 150), (200, 20)),
 ]
+
+hero = None
+enemies = []
+flag = Actor("flag", (WIDTH // 2, 100))
 
 def draw():
     screen.clear()
@@ -60,11 +66,17 @@ def draw_menu():
     screen.draw.text("Exit", center=(WIDTH // 2, 370), fontsize=40, color="red")
 
 def on_mouse_down(pos):
-    global game_state, music_on, enemies
+    global game_state, music_on, enemies, hero
+
     if game_state == "menu":
         if 300 < pos[0] < 500 and 210 < pos[1] < 250:
             game_state = "game"
-            enemies = [Enemy(platform) for platform in random.sample(platforms[1:], 3)]
+            enemies = []
+            for platform in random.sample(platforms[1:], 3):
+                if random.choice([True, False]):
+                    enemies.append(Enemy(platform))
+                else:
+                    enemies.append(Enemy2(platform))
             hero.respawn()
         elif 300 < pos[0] < 500 and 280 < pos[1] < 320:
             music_on = not music_on
@@ -141,26 +153,20 @@ class Hero:
         elif moving:
             if self.animation_counter % 10 == 0:
                 self.index = (self.index + 1) % len(self.run_frames_right)
-            if self.direction == 1:
-                self.actor.image = self.run_frames_right[self.index]
-            else:
-                self.actor.image = self.run_frames_left[self.index]
+            self.actor.image = self.run_frames_right[self.index] if self.direction == 1 else self.run_frames_left[self.index]
         else:
             if self.animation_counter % 20 == 0:
                 self.index = (self.index + 1) % len(self.idle_frames_right)
-            if self.direction == 1:
-                self.actor.image = self.idle_frames_right[self.index]
-            else:
-                self.actor.image = self.idle_frames_left[self.index]
+            self.actor.image = self.idle_frames_right[self.index] if self.direction == 1 else self.idle_frames_left[self.index]
 
     def draw(self):
         self.actor.draw()
+
 
 class Enemy:
     def __init__(self, platform):
         self.idle_frames = ["enemy_idle1", "enemy_idle2"]
         self.run_frames = ["enemy_walk1", "enemy_walk2"]
-        self.jump_frame = "enemy_jump"
         self.index = 0
         self.actor = Actor(self.idle_frames[self.index])
         self.platform = platform
@@ -188,8 +194,32 @@ class Enemy:
     def draw(self):
         self.actor.draw()
 
-hero = Hero()
-enemies = []
+
+class Enemy2:
+    def __init__(self, platform):
+        self.idle_frames = ["enemy2_idle1", "enemy2_idle2"]
+        self.index = 0
+        self.actor = Actor(self.idle_frames[self.index])
+        self.platform = platform
+        self.actor.x = random.randint(platform.left + 20, platform.right - 20)
+        self.actor.y = platform.top - 20
+        self.base_y = self.actor.y
+        self.jump_amplitude = 30
+        self.jump_speed = 0.1
+        self.time = 0
+        self.animation_counter = 0
+
+    def update(self):
+        self.time += self.jump_speed
+        self.actor.y = self.base_y + self.jump_amplitude * math.sin(self.time)
+
+        self.animation_counter += 1
+        if self.animation_counter % 10 == 0:
+            self.index = (self.index + 1) % len(self.idle_frames)
+            self.actor.image = self.idle_frames[self.index]
+
+    def draw(self):
+        self.actor.draw()
 
 def check_platform_collision(hero):
     hero.on_ground = False
@@ -202,7 +232,8 @@ def check_platform_collision(hero):
             hero.on_ground = True
             return
 
-flag = Actor("flag", (WIDTH // 2, 100))
 
 def check_finish():
     return hero.actor.colliderect(flag)
+
+hero = Hero()
